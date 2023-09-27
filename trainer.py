@@ -1,20 +1,24 @@
-import argparse
-import logging
-import os
-import random
-import sys
-import time
+import argparse, logging, os, random, sys, time
+
 import numpy as np
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from tensorboardX import SummaryWriter
 from torch.nn.modules.loss import CrossEntropyLoss
 from torch.utils.data import DataLoader
-from tqdm import tqdm
-from utils import DiceLoss
 from torchvision import transforms
+
+from tensorboardX import SummaryWriter
+
+import wandb
+
+from tqdm import tqdm
+
+#from utils import MSELoss
+from utils import DiceLoss
 from utils import test_single_volume
+
 
 def trainer_synapse(args, model, snapshot_path):
     from datasets.dataset_synapse import Synapse_dataset, RandomGenerator
@@ -39,9 +43,24 @@ def trainer_synapse(args, model, snapshot_path):
     if args.n_gpu > 1:
         model = nn.DataParallel(model)
     model.train()
+    # MSE loss, crop out borders
     ce_loss = CrossEntropyLoss()
     dice_loss = DiceLoss(num_classes)
     optimizer = optim.SGD(model.parameters(), lr=base_lr, momentum=0.9, weight_decay=0.0001)
+
+    wandb.init(
+        # set the wandb project where this run will be logged
+        project="swin-unet",
+
+        # track hyperparameters and run metadata
+        config={
+            "learning_rate": base_lr,
+            'weight_decay': 0.0001,
+            "architecture": "swin-unet",
+            "dataset": "synapse",
+        }
+    )
+
     writer = SummaryWriter(snapshot_path + '/log')
     iter_num = 0
     max_epoch = args.max_epochs
@@ -52,8 +71,11 @@ def trainer_synapse(args, model, snapshot_path):
     for epoch_num in iterator:
         for i_batch, sampled_batch in enumerate(trainloader):
             image_batch, label_batch = sampled_batch['image'], sampled_batch['label']
+            print("image_batch shape", image_batch.shape)
+            print("label_batch shape", label_batch.shape)
             image_batch, label_batch = image_batch.cuda(), label_batch.cuda()
             outputs = model(image_batch)
+            print("outputs shape", outputs.shape)
             loss_ce = ce_loss(outputs, label_batch[:].long())
             loss_dice = dice_loss(outputs, label_batch, softmax=True)
             loss = 0.4 * loss_ce + 0.6 * loss_dice
@@ -68,6 +90,18 @@ def trainer_synapse(args, model, snapshot_path):
             writer.add_scalar('info/lr', lr_, iter_num)
             writer.add_scalar('info/total_loss', loss, iter_num)
             writer.add_scalar('info/loss_ce', loss_ce, iter_num)
+
+            wandb.log({"lr": lr_})
+            wandb.log({"loss": loss})
+            wandb.log({"loss_ce": loss_ce})
+            
+            wandb.log(
+                    {"predictions": {
+                        "input": wandb.Image(image_batch[0].cpu().detach().numpy().transpose(1, 2, 0)),
+                        "output": wandb.Image(outputs[:][0].cpu().detach().numpy().transpose(1, 2, 0)[:, :, 0]),
+                        "label": wandb.Image(label_batch[0].unsqueeze(0).cpu().detach().numpy().transpose(1, 2, 0))
+                    }}
+                )
 
             logging.info('iteration %d : loss : %f, loss_ce: %f' % (iter_num, loss.item(), loss_ce.item()))
 
@@ -94,4 +128,5 @@ def trainer_synapse(args, model, snapshot_path):
             break
 
     writer.close()
+    wandb.finish()
     return "Training Finished!"
