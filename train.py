@@ -2,12 +2,19 @@ import argparse
 import logging
 import os
 import random
+
 import numpy as np
+
 import torch
 import torch.backends.cudnn as cudnn
+
 from networks.vision_transformer import SwinUnet as ViT_seg
+
 from trainer import trainer_synapse
+
 from config import get_config
+
+#import wandb
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--root_path', type=str,
