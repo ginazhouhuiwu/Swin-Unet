@@ -23,9 +23,7 @@ torch.cuda.set_device(gpu)
 device = torch.device("cuda:"+str(gpu) if torch.cuda.is_available() else "cpu")
 
 
-def trainer_synapse(args, model, snapshot_path):
-    
-    from datasets.dataset_synapse import Synapse_dataset, RandomGenerator
+def trainer_dlmd(args, model, snapshot_path):
     logging.basicConfig(filename=snapshot_path + "/log.txt", level=logging.INFO,
                         format='[%(asctime)s.%(msecs)03d] %(message)s', datefmt='%H:%M:%S')
     logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
@@ -34,10 +32,9 @@ def trainer_synapse(args, model, snapshot_path):
     num_classes = args.num_classes
     batch_size = args.batch_size * args.n_gpu
     # max_iterations = args.max_iterations
-    db_train = Synapse_dataset(base_dir=args.root_path, list_dir=args.list_dir, split="train",
-                               transform=transforms.Compose(
-                                   [RandomGenerator(output_size=[args.img_size, args.img_size])]))
-    print("The length of train set is: {}".format(len(db_train)))
+    trainloader_images, trainloader_labels, valloader_images, valloader_labels = split()
+    print("Training dataset length: {}".format(len(trainloader_images)))
+    print("Validation dataset length: {}".format(len(valloader_images)))
 
     def worker_init_fn(worker_id):
         random.seed(args.seed + worker_id)
@@ -49,8 +46,9 @@ def trainer_synapse(args, model, snapshot_path):
     model.train()
     # MSE loss, crop out borders
     ce_loss = CrossEntropyLoss()
-    dice_loss = DiceLoss(num_classes)
+    criterion = torch.nn.MSELoss()
     optimizer = optim.SGD(model.parameters(), lr=base_lr, momentum=0.9, weight_decay=0.0001)
+    # optimizer = optim.Adam(model.parameters(), lr=1e-5, betas=(0.9, 0.999), weight_decay=0.1)
 
     wandb.init(
         # set the wandb project where this run will be logged
@@ -72,32 +70,36 @@ def trainer_synapse(args, model, snapshot_path):
     logging.info("{} iterations per epoch. {} max iterations ".format(len(trainloader), max_iterations))
     best_performance = 0.0
     iterator = tqdm(range(max_epoch), ncols=70)
+
     for epoch_num in iterator:
+
         for i_batch, sampled_batch in enumerate(trainloader):
+
             image_batch, label_batch = sampled_batch['image'], sampled_batch['label']
             print("image_batch shape", image_batch.shape)
             print("label_batch shape", label_batch.shape)
+
             image_batch, label_batch = image_batch.cuda(), label_batch.cuda()
             outputs = model(image_batch)
             print("outputs shape", outputs.shape)
-            loss_ce = ce_loss(outputs, label_batch[:].long())
-            loss_dice = dice_loss(outputs, label_batch, softmax=True)
-            loss = 0.4 * loss_ce + 0.6 * loss_dice
+
+            # loss_ce = ce_loss(outputs, label_batch[:].long())
+            loss = criterion(outputs, label_batch)
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            lr_ = base_lr * (1.0 - iter_num / max_iterations) ** 0.9
-            for param_group in optimizer.param_groups:
-                param_group['lr'] = lr_
+
+            # lr_ = base_lr * (1.0 - iter_num / max_iterations) ** 0.9
+            # for param_group in optimizer.param_groups:
+            #     param_group['lr'] = lr_
 
             iter_num = iter_num + 1
-            writer.add_scalar('info/lr', lr_, iter_num)
-            writer.add_scalar('info/total_loss', loss, iter_num)
-            writer.add_scalar('info/loss_ce', loss_ce, iter_num)
+            
+            writer.add_scalar('info/lr', base_lr, iter_num)
+            writer.add_scalar('info/loss', loss, iter_num)
 
-            wandb.log({"lr": lr_})
+            wandb.log({"lr": base_lr})
             wandb.log({"loss": loss})
-            wandb.log({"loss_ce": loss_ce})
             
             wandb.log(
                     {"predictions": {
@@ -107,7 +109,7 @@ def trainer_synapse(args, model, snapshot_path):
                     }}
                 )
 
-            logging.info('iteration %d : loss : %f, loss_ce: %f' % (iter_num, loss.item(), loss_ce.item()))
+            logging.info('iteration %d : loss : %f' % (iter_num, loss.item()))
 
             if iter_num % 20 == 0:
                 image = image_batch[1, 0:1, :, :]
@@ -130,33 +132,6 @@ def trainer_synapse(args, model, snapshot_path):
             logging.info("save model to {}".format(save_mode_path))
             iterator.close()
             break
-
-    writer.close()
-    wandb.finish()
-    return "Training Finished!"
-
-def trainer_dlmd():
-    wandb.init(
-        # set the wandb project where this run will be logged
-        project="swin-unet",
-
-        # track hyperparameters and run metadata
-        config={
-            "learning_rate": base_lr,
-            'weight_decay': 0.0001,
-            "architecture": "swin-unet",
-            "dataset": "synapse",
-        }
-    )
-
-    trainloader_images, trainloader_labels, valloader_images, valloader_labels = split()
-    print("Training dataset length: {}".format(len(trainloader_images)))
-    print("Validation dataset length: {}".format(len(valloader_images)))
-
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-5, betas=(0.9, 0.999), weight_decay=0.1)
-    criterion = nn.MSELoss()
-
-    loss = criterion(crop_pad(outputs), crop_pad(labels))
 
     writer.close()
     wandb.finish()
