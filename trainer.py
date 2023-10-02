@@ -20,7 +20,7 @@ from tqdm import tqdm
 gpu = 0
 os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
 torch.cuda.set_device(gpu)
-device = torch.device("cuda:"+str(gpu) if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda:" + str(gpu) if torch.cuda.is_available() else "cpu")
 
 
 def trainer_dlmd(args, model, snapshot_path):
@@ -32,18 +32,16 @@ def trainer_dlmd(args, model, snapshot_path):
     num_classes = args.num_classes
     batch_size = args.batch_size * args.n_gpu
     # max_iterations = args.max_iterations
+
     trainloader_images, trainloader_labels, valloader_images, valloader_labels = split()
     print("Training dataset length: {}".format(len(trainloader_images)))
     print("Validation dataset length: {}".format(len(valloader_images)))
 
-    def worker_init_fn(worker_id):
-        random.seed(args.seed + worker_id)
-
-    trainloader = DataLoader(db_train, batch_size=batch_size, shuffle=True, num_workers=8, pin_memory=True,
-                             worker_init_fn=worker_init_fn)
     if args.n_gpu > 1:
         model = nn.DataParallel(model)
+
     model.train()
+
     # MSE loss, crop out borders
     ce_loss = CrossEntropyLoss()
     criterion = torch.nn.MSELoss()
@@ -59,7 +57,7 @@ def trainer_dlmd(args, model, snapshot_path):
             "learning_rate": base_lr,
             'weight_decay': 0.0001,
             "architecture": "swin-unet",
-            "dataset": "synapse",
+            "dataset": "dlmd",
         }
     )
 
@@ -73,11 +71,19 @@ def trainer_dlmd(args, model, snapshot_path):
 
     for epoch_num in iterator:
 
-        for i_batch, sampled_batch in enumerate(trainloader):
+        for i, data in enumerate(zip(trainloader_images, trainloader_labels)):
 
-            image_batch, label_batch = sampled_batch['image'], sampled_batch['label']
-            print("image_batch shape", image_batch.shape)
-            print("label_batch shape", label_batch.shape)
+            inputs, labels = data[0], data[1]
+            inputs, labels = inputs.cuda(), labels.cuda()
+
+            print("image shape", image_batch.shape)
+            print("label shape", label_batch.shape)
+
+            inputs = inputs[:, 0, ...].unsqueeze(1)
+            inputs = labels[:, 0, ...].unsqueeze(1)
+
+            print("image single channel shape", image_batch.shape)
+            print("label single channel shape", label_batch.shape)
 
             image_batch, label_batch = image_batch.cuda(), label_batch.cuda()
             outputs = model(image_batch)

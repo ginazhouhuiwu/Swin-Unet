@@ -13,8 +13,9 @@ from config import get_config
 
 
 parser = argparse.ArgumentParser()
-# parser.add_argument('--root_path', type=str,
-#                     default='../data/Synapse/train_npz', help='root dir for data')
+parser.add_argument('--root_path', type=str,
+                    default='/home/gwu_waller/2tb_ssd/dlmd/diffuser_images_npy', 
+                    help='root dir for data')
 parser.add_argument('--dataset', type=str,
                     default='DLMD', help='experiment_name')
 # parser.add_argument('--list_dir', type=str,
@@ -60,8 +61,6 @@ parser.add_argument('--eval', action='store_true', help='Perform evaluation only
 parser.add_argument('--throughput', action='store_true', help='Test throughput only')
 
 args = parser.parse_args()
-if args.dataset == "Synapse":
-    args.root_path = os.path.join(args.root_path, "train_npz")
 config = get_config(args)
 
 
@@ -80,10 +79,10 @@ if __name__ == "__main__":
 
     dataset_name = args.dataset
     dataset_config = {
-        'Synapse': {
+        'DLMD': {
             'root_path': args.root_path,
             'list_dir': './lists/lists_Synapse',
-            'num_classes': 9,
+            'num_classes': 1,
         },
     }
 
