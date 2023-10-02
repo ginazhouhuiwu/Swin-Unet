@@ -9,16 +9,6 @@ from scipy import ndimage
 from scipy.ndimage.interpolation import zoom
 
 
-file_path_diffuser = '../../2tb_ssd/dlmd/diffuser_images/'
-file_path_lensed = '../../2tb_ssd/dlmd/ground_truth_lensed/'
-
-diffuser_files = glob.glob(file_path_diffuser + '/*.npy')
-lensed_files = glob.glob(file_path_lensed + '/*.npy')
-assert len(diffuser_files) == 24999, len(lensed_files) == 24999
-
-diffuser_files.sort()
-lensed_files.sort()
-
 def preprocess(image):
     # output_shape = (3, 210, 380)
     image = image.transpose(1, 2, 0)
@@ -75,8 +65,8 @@ class DLMDDataset(Dataset):
         return image
     
 def split():
-    file_path_diffuser = '../../2tb_ssd/dlmd/diffuser_images/'
-    file_path_lensed = '../../2tb_ssd/dlmd/ground_truth_lensed/'
+    file_path_diffuser = '/home/gwu_waller/2tb_ssd/dlmd/diffuser_images'
+    file_path_lensed = '/home/gwu_waller/2tb_ssd/dlmd/ground_truth_lensed'
 
     diffuser_files = glob.glob(file_path_diffuser + '/*.npy')
     lensed_files = glob.glob(file_path_lensed + '/*.npy')
@@ -100,5 +90,5 @@ def split():
 
     valloader_images = DataLoader(valdata_images, batch_size=1, shuffle=False, num_workers=4)
     valloader_labels = DataLoader(valdata_labels, batch_size=1, shuffle=False, num_workers=4)
-    
+
     return trainloader_images, trainloader_labels, valloader_images, valloader_labels

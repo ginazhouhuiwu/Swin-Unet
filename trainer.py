@@ -1,12 +1,13 @@
 import argparse, logging, os, random, sys, time
 
+from datasets.dataset_dlmd import crop_pad, split
+
 import numpy as np
 
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.nn.modules.loss import CrossEntropyLoss
-from torch.utils.data import DataLoader
 from torchvision import transforms
 
 from tensorboardX import SummaryWriter
@@ -15,12 +16,15 @@ import wandb
 
 from tqdm import tqdm
 
-#from utils import MSELoss
-from utils import DiceLoss
-from utils import test_single_volume
+
+gpu = 0
+os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
+torch.cuda.set_device(gpu)
+device = torch.device("cuda:"+str(gpu) if torch.cuda.is_available() else "cpu")
 
 
 def trainer_synapse(args, model, snapshot_path):
+    
     from datasets.dataset_synapse import Synapse_dataset, RandomGenerator
     logging.basicConfig(filename=snapshot_path + "/log.txt", level=logging.INFO,
                         format='[%(asctime)s.%(msecs)03d] %(message)s', datefmt='%H:%M:%S')
@@ -126,6 +130,33 @@ def trainer_synapse(args, model, snapshot_path):
             logging.info("save model to {}".format(save_mode_path))
             iterator.close()
             break
+
+    writer.close()
+    wandb.finish()
+    return "Training Finished!"
+
+def trainer_dlmd():
+    wandb.init(
+        # set the wandb project where this run will be logged
+        project="swin-unet",
+
+        # track hyperparameters and run metadata
+        config={
+            "learning_rate": base_lr,
+            'weight_decay': 0.0001,
+            "architecture": "swin-unet",
+            "dataset": "synapse",
+        }
+    )
+
+    trainloader_images, trainloader_labels, valloader_images, valloader_labels = split()
+    print("Training dataset length: {}".format(len(trainloader_images)))
+    print("Validation dataset length: {}".format(len(valloader_images)))
+
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-5, betas=(0.9, 0.999), weight_decay=0.1)
+    criterion = nn.MSELoss()
+
+    loss = criterion(crop_pad(outputs), crop_pad(labels))
 
     writer.close()
     wandb.finish()
