@@ -31,7 +31,8 @@ def center_pad(img):
     return np.pad(img, ((0, 0), (pad, pad), (pad, pad)), constant_values=(0, 0))
 
 def crop_pad(img):
-    pad = (img.shape[1] - 192) // 2
+    assert img.shape[-1] == img.shape[-2]
+    pad = (img.shape[-1] - 192) // 2
     return img[..., pad:-pad, pad:-pad]
 
 class DLMDDataset(Dataset):

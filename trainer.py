@@ -86,11 +86,25 @@ def trainer_dlmd(args, model, snapshot_path):
             # print("label single channel shape", labels.shape)
 
             inputs, labels = inputs.cuda(), labels.cuda()
+            # print("labels", labels)
+            # print("labels.shape", labels.shape)
             outputs = model(inputs)
+            # print("outputs", torch.sum(torch.isnan(outputs)))
             # print("outputs shape", outputs.shape)
+            # save_dict = {}
+            # save_dict["output"] = outputs
+            # save_dict["labels"] = labels
+            # torch.save(save_dict, "stuff.pt")
 
             # loss_ce = ce_loss(outputs, labels[:].long())
             loss = criterion(crop_pad(outputs), crop_pad(labels))
+            # print("crop_pad(outputs)", crop_pad(outputs))
+            # print("crop_pad(outputs).shape", crop_pad(outputs).shape)
+            # print("crop_pad(outputs).dtype", crop_pad(outputs).dtype)
+            # print("crop_pad(labels)", crop_pad(labels))
+            # print("crop_pad(labels).shape", crop_pad(labels).shape)
+            # print("crop_pad(labels).dtype", crop_pad(labels).dtype)
+        
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
