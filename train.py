@@ -18,8 +18,6 @@ parser.add_argument('--root_path', type=str,
                     help='root dir for data')
 parser.add_argument('--dataset', type=str,
                     default='DLMD', help='experiment_name')
-# parser.add_argument('--list_dir', type=str,
-#                     default='./lists/lists_Synapse', help='list dir')
 parser.add_argument('--num_classes', type=int,
                     default=1, help='output channel of network')
 parser.add_argument('--output_dir', type=str, help='output dir')                   
@@ -81,7 +79,6 @@ if __name__ == "__main__":
     dataset_config = {
         'DLMD': {
             'root_path': args.root_path,
-            'list_dir': './lists/lists_Synapse',
             'num_classes': 1,
         },
     }
@@ -90,7 +87,6 @@ if __name__ == "__main__":
         args.base_lr *= args.batch_size / 24
     args.num_classes = dataset_config[dataset_name]['num_classes']
     args.root_path = dataset_config[dataset_name]['root_path']
-    args.list_dir = dataset_config[dataset_name]['list_dir']
 
     if not os.path.exists(args.output_dir):
         os.makedirs(args.output_dir)

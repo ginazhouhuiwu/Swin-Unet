@@ -31,7 +31,6 @@ def center_pad(img):
     return np.pad(img, ((0, 0), (pad, pad), (pad, pad)), constant_values=(0, 0))
 
 def crop_pad(img):
-    # output_shape = (3, 192, 192)
     pad = (img.shape[1] - 192) // 2
     return img[..., pad:-pad, pad:-pad]
 
@@ -54,7 +53,7 @@ class DLMDDataset(Dataset):
 
         img_path = self.file_list[idx]
         image_np = np.load(img_path).transpose((2, 0, 1))  # Load image as numpy array
-        image_np = center_pad(preprocess(image_np))
+        image_np = center_pad(crop_center_square(preprocess(image_np)))
             
         # Convert image from numpy array to tensor
         image = torch.from_numpy(image_np.copy())
@@ -75,7 +74,7 @@ def split():
     diffuser_files.sort()
     lensed_files.sort()
 
-    N_train = 20000
+    N_train = 24900
     trainfiles_images, valfiles_images= diffuser_files[:N_train], diffuser_files[N_train:]
     trainfiles_labels, valfiles_labels = lensed_files[:N_train], lensed_files[N_train:]
 

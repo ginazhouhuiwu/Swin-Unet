@@ -17,7 +17,7 @@ import wandb
 from tqdm import tqdm
 
 
-gpu = 0
+gpu = 2
 os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
 torch.cuda.set_device(gpu)
 device = torch.device("cuda:" + str(gpu) if torch.cuda.is_available() else "cpu")
@@ -64,8 +64,8 @@ def trainer_dlmd(args, model, snapshot_path):
     writer = SummaryWriter(snapshot_path + '/log')
     iter_num = 0
     max_epoch = args.max_epochs
-    max_iterations = args.max_epochs * len(trainloader)  # max_epoch = max_iterations // len(trainloader) + 1
-    logging.info("{} iterations per epoch. {} max iterations ".format(len(trainloader), max_iterations))
+    max_iterations = args.max_epochs * len(trainloader_images)  # max_epoch = max_iterations // len(trainloader) + 1
+    logging.info("{} iterations per epoch. {} max iterations ".format(len(trainloader_images), max_iterations))
     best_performance = 0.0
     iterator = tqdm(range(max_epoch), ncols=70)
 
@@ -76,21 +76,21 @@ def trainer_dlmd(args, model, snapshot_path):
             inputs, labels = data[0], data[1]
             inputs, labels = inputs.cuda(), labels.cuda()
 
-            print("image shape", image_batch.shape)
-            print("label shape", label_batch.shape)
+            print("image shape", inputs.shape)
+            print("label shape", labels.shape)
 
             inputs = inputs[:, 0, ...].unsqueeze(1)
-            inputs = labels[:, 0, ...].unsqueeze(1)
+            labels = labels[:, 0, ...].unsqueeze(1)
 
-            print("image single channel shape", image_batch.shape)
-            print("label single channel shape", label_batch.shape)
+            print("image single channel shape", inputs.shape)
+            print("label single channel shape", labels.shape)
 
-            image_batch, label_batch = image_batch.cuda(), label_batch.cuda()
-            outputs = model(image_batch)
+            inputs, labels = inputs.cuda(), labels.cuda()
+            outputs = model(inputs)
             print("outputs shape", outputs.shape)
 
-            # loss_ce = ce_loss(outputs, label_batch[:].long())
-            loss = criterion(outputs, label_batch)
+            # loss_ce = ce_loss(outputs, labels[:].long())
+            loss = criterion(crop_pad(outputs), crop_pad(labels))
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -109,21 +109,21 @@ def trainer_dlmd(args, model, snapshot_path):
             
             wandb.log(
                     {"predictions": {
-                        "input": wandb.Image(image_batch[0].cpu().detach().numpy().transpose(1, 2, 0)),
+                        "input": wandb.Image(inputs[0].cpu().detach().numpy().transpose(1, 2, 0)),
                         "output": wandb.Image(outputs[:][0].cpu().detach().numpy().transpose(1, 2, 0)[:, :, 0]),
-                        "label": wandb.Image(label_batch[0].unsqueeze(0).cpu().detach().numpy().transpose(1, 2, 0))
+                        "label": wandb.Image(labels[0].unsqueeze(0).cpu().detach().numpy().transpose(1, 2, 0))
                     }}
                 )
 
             logging.info('iteration %d : loss : %f' % (iter_num, loss.item()))
 
             if iter_num % 20 == 0:
-                image = image_batch[1, 0:1, :, :]
+                image = inputs[1, 0:1, :, :]
                 image = (image - image.min()) / (image.max() - image.min())
                 writer.add_image('train/Image', image, iter_num)
                 outputs = torch.argmax(torch.softmax(outputs, dim=1), dim=1, keepdim=True)
                 writer.add_image('train/Prediction', outputs[1, ...] * 50, iter_num)
-                labs = label_batch[1, ...].unsqueeze(0) * 50
+                labs = labels[1, ...].unsqueeze(0) * 50
                 writer.add_image('train/GroundTruth', labs, iter_num)
 
         save_interval = 50  # int(max_epoch/6)

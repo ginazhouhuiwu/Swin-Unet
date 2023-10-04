@@ -5,7 +5,6 @@ from scipy.ndimage import zoom
 import torch.nn as nn
 import SimpleITK as sitk
 
-###TODO: implement MSE loss with cropping
 
 class DiceLoss(nn.Module):
     def __init__(self, n_classes):
