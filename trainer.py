@@ -61,7 +61,7 @@ def trainer_dlmd(args, model, snapshot_path):
         }
     )
 
-    writer = SummaryWriter(snapshot_path + '/log')
+    # writer = SummaryWriter(snapshot_path + '/log')
     iter_num = 0
     max_epoch = args.max_epochs
     max_iterations = args.max_epochs * len(trainloader_images)  # max_epoch = max_iterations // len(trainloader) + 1
@@ -76,18 +76,18 @@ def trainer_dlmd(args, model, snapshot_path):
             inputs, labels = data[0], data[1]
             inputs, labels = inputs.cuda(), labels.cuda()
 
-            print("image shape", inputs.shape)
-            print("label shape", labels.shape)
+            # print("image shape", inputs.shape)
+            # print("label shape", labels.shape)
 
             inputs = inputs[:, 0, ...].unsqueeze(1)
             labels = labels[:, 0, ...].unsqueeze(1)
 
-            print("image single channel shape", inputs.shape)
-            print("label single channel shape", labels.shape)
+            # print("image single channel shape", inputs.shape)
+            # print("label single channel shape", labels.shape)
 
             inputs, labels = inputs.cuda(), labels.cuda()
             outputs = model(inputs)
-            print("outputs shape", outputs.shape)
+            # print("outputs shape", outputs.shape)
 
             # loss_ce = ce_loss(outputs, labels[:].long())
             loss = criterion(crop_pad(outputs), crop_pad(labels))
@@ -101,30 +101,31 @@ def trainer_dlmd(args, model, snapshot_path):
 
             iter_num = iter_num + 1
             
-            writer.add_scalar('info/lr', base_lr, iter_num)
-            writer.add_scalar('info/loss', loss, iter_num)
-
-            wandb.log({"lr": base_lr})
-            wandb.log({"loss": loss})
+            # writer.add_scalar('info/loss', loss, iter_num)
+            wandb.log({"loss": loss.item()})
+            print(loss.item())
             
+            # print(inputs[0].cpu().detach().numpy().shape)
+            # print(outputs[:][0].cpu().detach().numpy().shape)
+            # print(labels[0].unsqueeze(0).cpu().detach().numpy().shape)
             wandb.log(
                     {"predictions": {
                         "input": wandb.Image(inputs[0].cpu().detach().numpy().transpose(1, 2, 0)),
                         "output": wandb.Image(outputs[:][0].cpu().detach().numpy().transpose(1, 2, 0)[:, :, 0]),
-                        "label": wandb.Image(labels[0].unsqueeze(0).cpu().detach().numpy().transpose(1, 2, 0))
+                        "label": wandb.Image(labels[0].cpu().detach().numpy().transpose(1, 2, 0))
                     }}
                 )
 
             logging.info('iteration %d : loss : %f' % (iter_num, loss.item()))
 
-            if iter_num % 20 == 0:
-                image = inputs[1, 0:1, :, :]
-                image = (image - image.min()) / (image.max() - image.min())
-                writer.add_image('train/Image', image, iter_num)
-                outputs = torch.argmax(torch.softmax(outputs, dim=1), dim=1, keepdim=True)
-                writer.add_image('train/Prediction', outputs[1, ...] * 50, iter_num)
-                labs = labels[1, ...].unsqueeze(0) * 50
-                writer.add_image('train/GroundTruth', labs, iter_num)
+            # if iter_num % 20 == 0:
+            #     image = inputs[0]
+            #     image = (image - image.min()) / (image.max() - image.min())
+            #     writer.add_image('train/Image', image, iter_num)
+            #     outputs = torch.argmax(torch.softmax(outputs, dim=1), dim=1, keepdim=True)
+            #     writer.add_image('train/Prediction', outputs[1, ...] * 50, iter_num)
+            #     labs = labels[1, ...].unsqueeze(0) * 50
+            #     writer.add_image('train/GroundTruth', labs, iter_num)
 
         save_interval = 50  # int(max_epoch/6)
         if epoch_num > int(max_epoch / 2) and (epoch_num + 1) % save_interval == 0:
@@ -139,6 +140,6 @@ def trainer_dlmd(args, model, snapshot_path):
             iterator.close()
             break
 
-    writer.close()
+    # writer.close()
     wandb.finish()
     return "Training Finished!"
